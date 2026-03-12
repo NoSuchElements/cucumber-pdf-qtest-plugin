@@ -1,8 +1,5 @@
 # Cucumber PDF QTest Plugin
 
-**groupId:** `com.nosuchelements`  
-**artifactId:** `cucumber-pdf-qtest-plugin`  
-**version:** `1.0.0`
 
 A re-implementation of the [cucumber-pdf-plugin](https://github.com/NoSuchElements/cucumber-pdf-plugin-feature) that generates **one PDF report per feature file**, with file names appended with the `@QTEST_TC_` tag value.
 
