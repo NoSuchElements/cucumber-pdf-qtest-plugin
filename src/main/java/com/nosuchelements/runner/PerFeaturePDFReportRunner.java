@@ -1,5 +1,6 @@
 package com.nosuchelements.runner;
 
+import java.io.File;
 import java.io.FileReader;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -58,32 +59,53 @@ public class PerFeaturePDFReportRunner {
         FeatureReportFileNameBuilder nameBuilder =
                 new FeatureReportFileNameBuilder();
 
-        int count = 0;
+        int successCount = 0;
+        int failureCount = 0;
+        
         for (Feature feature : features) {
             String pdfFileName = nameBuilder.buildFileName(feature);
+            
+            try {
+                // Create File object with custom name for this feature
+                File reportFile = new File(outputDir, pdfFileName);
 
-            List<Feature> singleFeature = new ArrayList<>();
-            singleFeature.add(feature);
+                List<Feature> singleFeature = new ArrayList<>();
+                singleFeature.add(feature);
 
-            PDFCucumberReportDataGenerator generator =
-                    new PDFCucumberReportDataGenerator();
-            ReportData reportData = generator.generateReportData(singleFeature);
+                PDFCucumberReportDataGenerator generator =
+                        new PDFCucumberReportDataGenerator();
+                ReportData reportData = generator.generateReportData(singleFeature);
 
-            ParameterConfig paramConfig = ParameterConfig.builder()
-                    .title(feature.getName())
-                    .build();
+                ParameterConfig paramConfig = ParameterConfig.builder()
+                        .title(feature.getName())
+                        .build();
 
-            PDFCucumberReport pdfReport = new PDFCucumberReport(
-                    reportData, outputDir,
-                    MediaCleanupOption.builder()
-                            .cleanUpType(CleanupType.ALL).build());
-            pdfReport.setParameterConfig(paramConfig);
-            pdfReport.createReport();
+                // Use File-based constructor for proper per-feature naming
+                PDFCucumberReport pdfReport = new PDFCucumberReport(
+                        reportData, reportFile,
+                        MediaCleanupOption.builder()
+                                .cleanUpType(CleanupType.ALL).build());
+                pdfReport.setParameterConfig(paramConfig);
+                pdfReport.createReport();
 
-            count++;
-            System.out.printf("Generated: %s/%s%n", outputDir, pdfFileName);
+                successCount++;
+                System.out.printf("Generated: %s/%s%n", outputDir, pdfFileName);
+                
+            } catch (Throwable t) {
+                failureCount++;
+                System.err.printf("Failed to generate PDF for feature '%s' (file: %s): %s%n",
+                        feature.getName(), pdfFileName, t.getMessage());
+                t.printStackTrace();
+            }
         }
 
-        System.out.printf("%nDone. Generated %d PDF reports.%n", count);
+        System.out.printf("%nDone. Generated %d PDF reports successfully, %d failed.%n",
+                successCount, failureCount);
+                
+        if (failureCount > 0) {
+            System.err.printf("WARNING: %d feature(s) failed to generate PDF reports%n",
+                    failureCount);
+            System.exit(1);
+        }
     }
 }

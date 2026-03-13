@@ -1,5 +1,6 @@
 package com.nosuchelements;
 
+import java.io.File;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
@@ -116,42 +117,66 @@ public class CucumberPDFQTestPlugin extends AbstractMojo {
             FeatureReportFileNameBuilder nameBuilder =
                     new FeatureReportFileNameBuilder(qtestTagPrefix);
 
-            int featureCount = 0;
+            int successCount = 0;
+            int failureCount = 0;
+            
             for (Feature feature : allFeatures) {
                 String pdfFileName = nameBuilder.buildFileName(feature);
+                
+                try {
+                    // Create File object with custom name for this feature
+                    File reportFile = new File(reportProperties.getReportDirectory(), pdfFileName);
 
-                List<Feature> singleFeatureList = new ArrayList<>();
-                singleFeatureList.add(feature);
+                    List<Feature> singleFeatureList = new ArrayList<>();
+                    singleFeatureList.add(feature);
 
-                PDFCucumberReportDataGenerator generator =
-                        new PDFCucumberReportDataGenerator();
-                ReportData reportData = generator.generateReportData(singleFeatureList);
+                    PDFCucumberReportDataGenerator generator =
+                            new PDFCucumberReportDataGenerator();
+                    ReportData reportData = generator.generateReportData(singleFeatureList);
 
-                String featureTitle = (title != null ? title + " - " : "")
-                        + feature.getName();
+                    String featureTitle = (title != null ? title + " - " : "")
+                            + feature.getName();
 
-                ParameterConfig featureParamConfig = ParameterConfig.builder()
-                        .title(featureTitle).titleColor(titleColor)
-                        .passColor(passColor).failColor(failColor).skipColor(skipColor)
-                        .displayFeature(displayFeature).displayScenario(displayScenario)
-                        .displayDetailed(displayDetailed).displayExpanded(displayExpanded)
-                        .displayAttached(displayAttached).skipHooks(skipHooks)
-                        .skipScenarioHooks(skipScenarioHooks)
-                        .skipStepHooks(skipStepHooks).build();
+                    ParameterConfig featureParamConfig = ParameterConfig.builder()
+                            .title(featureTitle).titleColor(titleColor)
+                            .passColor(passColor).failColor(failColor).skipColor(skipColor)
+                            .displayFeature(displayFeature).displayScenario(displayScenario)
+                            .displayDetailed(displayDetailed).displayExpanded(displayExpanded)
+                            .displayAttached(displayAttached).skipHooks(skipHooks)
+                            .skipScenarioHooks(skipScenarioHooks)
+                            .skipStepHooks(skipStepHooks).build();
 
-                PDFCucumberReport pdfReport = new PDFCucumberReport(reportData,
-                        reportProperties.getReportDirectory(),
-                        MediaCleanupOption.builder()
-                                .cleanUpType(CleanupType.ALL).build());
-                pdfReport.setParameterConfig(featureParamConfig);
-                pdfReport.createReport();
+                    // Use File-based constructor for proper per-feature naming
+                    PDFCucumberReport pdfReport = new PDFCucumberReport(reportData,
+                            reportFile,
+                            MediaCleanupOption.builder()
+                                    .cleanUpType(CleanupType.ALL).build());
+                    pdfReport.setParameterConfig(featureParamConfig);
+                    pdfReport.createReport();
 
-                featureCount++;
-                logger.info(String.format("Generated PDF report: %s", pdfFileName));
+                    successCount++;
+                    logger.info(String.format("Generated PDF report: %s", pdfFileName));
+                    
+                } catch (Throwable t) {
+                    // Log individual feature failure but continue processing others
+                    failureCount++;
+                    logger.error(String.format(
+                            "Failed to generate PDF for feature '%s' (file: %s): %s",
+                            feature.getName(), pdfFileName, t.getMessage()));
+                    t.printStackTrace();
+                }
             }
 
             logger.info(String.format(
-                    "FINISHED - Generated %d PDF reports (one per feature)", featureCount));
+                    "FINISHED - Generated %d PDF reports successfully, %d failed",
+                    successCount, failureCount));
+                    
+            if (failureCount > 0) {
+                logger.error(String.format(
+                        "WARNING: %d feature(s) failed to generate PDF reports",
+                        failureCount));
+            }
+            
         } catch (Throwable t) {
             t.printStackTrace();
             logger.error(String.format(
